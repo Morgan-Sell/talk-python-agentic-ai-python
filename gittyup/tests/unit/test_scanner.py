@@ -1,17 +1,18 @@
 """
-Unit tests for the DirectoryScanner module.
+Unit tests for the DirectoryScanner/RepositoryScanner module.
 """
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from gittyup.core.scanner import DirectoryScanner
+from gittyup.core.scanner import DirectoryScanner, RepositoryScanner
 from gittyup.exceptions import ScannerError
 
 
 class TestDirectoryScanner:
-    """Test cases for DirectoryScanner class."""
+    """Test cases for DirectoryScanner class (now RepositoryScanner)."""
 
     def test_scanner_initialization(self, temp_dir: Path):
         """Test that scanner initializes correctly."""
@@ -37,67 +38,68 @@ class TestDirectoryScanner:
         assert scanner.follow_symlinks is False
 
     def test_scan_empty_directory(self, temp_dir: Path):
-        """Test scanning an empty directory."""
+        """Test scanning an empty directory (no git repos)."""
         scanner = DirectoryScanner(root_path=temp_dir)
-        directories = scanner.scan()
+        result = scanner.scan()
 
-        assert directories == []
+        # Phase 2: Returns ScanResult object
+        assert len(result.repositories) == 0
+        assert result.total_scanned > 0
 
-    def test_scan_simple_directory_tree(self, sample_dir_tree: Path):
-        """Test scanning a simple directory tree."""
-        scanner = DirectoryScanner(root_path=sample_dir_tree)
-        directories = scanner.scan()
+    def test_scan_simple_directory_tree(self, sample_git_tree: Path):
+        """Test scanning a simple directory tree with git repositories."""
+        scanner = DirectoryScanner(root_path=sample_git_tree)
+        result = scanner.scan()
 
-        # Should find project1, project2, subdir1, subdir2, subdir3, node_modules, venv
-        assert len(directories) >= 5
+        # Should find git repositories (project1 and project2)
+        assert len(result.repositories) >= 2
 
-        # Check that some expected directories are found
-        dir_names = [d.name for d in directories]
-        assert "project1" in dir_names
-        assert "project2" in dir_names
+        # Check that some expected git repositories are found
+        repo_names = [r.name for r in result.repositories]
+        assert "project1" in repo_names
+        assert "project2" in repo_names
 
-    def test_scan_with_exclusions(self, sample_dir_tree: Path):
+    def test_scan_with_exclusions(self, sample_git_tree: Path):
         """Test scanning with exclusion patterns."""
         scanner = DirectoryScanner(
-            root_path=sample_dir_tree, exclude_patterns=["node_modules", "venv"]
+            root_path=sample_git_tree, exclude_patterns=["node_modules", "venv"]
         )
-        directories = scanner.scan()
+        result = scanner.scan()
 
         # node_modules and venv should be excluded
-        dir_names = [d.name for d in directories]
-        assert "node_modules" not in dir_names
-        assert "venv" not in dir_names
+        repo_names = [r.name for r in result.repositories]
+        assert "node_modules" not in repo_names
+        assert "venv" not in repo_names
 
-    def test_scan_with_depth_limit(self, sample_dir_tree: Path):
+    def test_scan_with_depth_limit(self, sample_git_tree: Path):
         """Test scanning with depth limit."""
-        scanner = DirectoryScanner(root_path=sample_dir_tree, max_depth=1)
-        directories = scanner.scan()
+        scanner = DirectoryScanner(root_path=sample_git_tree, max_depth=1)
+        result = scanner.scan()
 
-        # Should only find first level directories
-        # subdir1, subdir2, subdir3 should not be found
-        dir_names = [d.name for d in directories]
-        assert "project1" in dir_names
-        assert "project2" in dir_names
-        # Subdirectories should not be in results at depth > 1
+        # Should only find first level repositories
+        repo_names = [r.name for r in result.repositories]
+        assert "project1" in repo_names
+        assert "project2" in repo_names
 
-    def test_get_statistics(self, sample_dir_tree: Path):
+    def test_get_statistics(self, sample_git_tree: Path):
         """Test getting scan statistics."""
-        scanner = DirectoryScanner(root_path=sample_dir_tree)
+        scanner = DirectoryScanner(root_path=sample_git_tree)
         scanner.scan()
 
         stats = scanner.get_statistics()
 
         assert "root_path" in stats
         assert "max_depth" in stats
-        assert "directories_found" in stats
+        assert "repositories_found" in stats  # Phase 2: changed from directories_found
         assert "exclude_patterns" in stats
-        assert stats["directories_found"] >= 0
+        assert stats["repositories_found"] >= 0
 
     def test_scan_nonexistent_directory(self, temp_dir: Path):
         """Test scanning a non-existent directory."""
         nonexistent = temp_dir / "does_not_exist"
         scanner = DirectoryScanner(root_path=nonexistent)
 
-        # Scanner handles non-existent directories gracefully by returning empty list
-        directories = scanner.scan()
-        assert directories == []
+        # Scanner handles non-existent directories gracefully
+        result = scanner.scan()
+        assert len(result.repositories) == 0
+        assert result.has_errors  # Phase 2: errors are tracked

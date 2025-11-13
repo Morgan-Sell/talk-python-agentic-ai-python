@@ -31,13 +31,13 @@ class TestCLIIntegration:
         assert "Gitty Up" in result.output
 
     def test_cli_scan_empty_directory(self, temp_dir: Path):
-        """Test scanning an empty directory."""
+        """Test scanning an empty directory (Phase 2: no git repos)."""
         runner = CliRunner()
         result = runner.invoke(main, [str(temp_dir)])
 
         assert result.exit_code == 0
         assert "Scanning" in result.output
-        assert "Found 0 directories" in result.output
+        assert "Found 0 git" in result.output or "No git repositories found" in result.output
 
     def test_cli_scan_with_directories(self, sample_dir_tree: Path):
         """Test scanning a directory tree."""
@@ -78,13 +78,13 @@ class TestCLIIntegration:
 
         assert result.exit_code == 0
 
-    def test_cli_dry_run(self, sample_dir_tree: Path):
-        """Test CLI in dry-run mode."""
+    def test_cli_dry_run(self, sample_git_tree: Path):
+        """Test CLI in dry-run mode (Phase 2: git repos)."""
         runner = CliRunner()
-        result = runner.invoke(main, [str(sample_dir_tree), "--dry-run"])
+        result = runner.invoke(main, [str(sample_git_tree), "--dry-run"])
 
         assert result.exit_code == 0
-        assert "Dry run complete" in result.output
+        assert "Dry run" in result.output or "Would execute" in result.output
 
     def test_cli_invalid_path(self):
         """Test CLI with invalid path."""

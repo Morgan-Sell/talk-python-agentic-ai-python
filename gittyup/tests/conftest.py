@@ -2,6 +2,7 @@
 Pytest configuration and fixtures for Gitty Up tests.
 """
 
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Generator
@@ -61,7 +62,7 @@ def sample_dir_tree(temp_dir: Path) -> Path:
 @pytest.fixture
 def sample_git_repo(temp_dir: Path) -> Path:
     """
-    Create a sample git repository for testing.
+    Create a sample git repository for testing (proper git structure).
 
     Args:
         temp_dir: Temporary directory fixture
@@ -72,12 +73,70 @@ def sample_git_repo(temp_dir: Path) -> Path:
     repo_dir = temp_dir / "test_repo"
     repo_dir.mkdir()
 
-    # Create .git directory to simulate a git repo
+    # Create proper .git directory structure
     git_dir = repo_dir / ".git"
     git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
     (git_dir / "config").write_text("[core]\n\trepositoryformatversion = 0\n")
+    (git_dir / "refs").mkdir()
+    (git_dir / "refs" / "heads").mkdir()
 
     return repo_dir
+
+
+@pytest.fixture
+def sample_git_tree(temp_dir: Path) -> Path:
+    """
+    Create a sample directory tree with git repositories for testing.
+
+    Structure:
+        temp_dir/
+        ├── project1/.git/
+        │   └── subdir1/
+        ├── project2/.git/
+        │   ├── subdir2/
+        │   └── subdir3/
+        ├── node_modules/
+        └── venv/
+
+    Args:
+        temp_dir: Temporary directory fixture
+
+    Returns:
+        Path to the root of the sample tree
+    """
+    # Create directory structure
+    project1 = temp_dir / "project1"
+    project1.mkdir()
+    (project1 / "subdir1").mkdir()
+
+    project2 = temp_dir / "project2"
+    project2.mkdir()
+    (project2 / "subdir2").mkdir()
+    (project2 / "subdir3").mkdir()
+
+    (temp_dir / "node_modules").mkdir()
+    (temp_dir / "venv").mkdir()
+
+    # Create git directories for project1
+    git1 = project1 / ".git"
+    git1.mkdir()
+    (git1 / "HEAD").write_text("ref: refs/heads/main\n")
+    (git1 / "config").write_text("[core]\n")
+    (git1 / "refs").mkdir()
+
+    # Create git directories for project2
+    git2 = project2 / ".git"
+    git2.mkdir()
+    (git2 / "HEAD").write_text("ref: refs/heads/main\n")
+    (git2 / "config").write_text("[core]\n")
+    (git2 / "refs").mkdir()
+
+    # Create some files
+    (project1 / "file1.txt").write_text("test")
+    (project2 / "file2.txt").write_text("test")
+
+    return temp_dir
 
 
 @pytest.fixture
